@@ -1,2 +1,4 @@
 /dev
 /__pycache__
+/mschatbot/__pycache__
+*.bin
