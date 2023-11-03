@@ -11,8 +11,8 @@ This sample **requires** prerequisites in order to run.
 ### Install Python 3.6
 
 ## Running the sample
-- Run `python app.py`
 
+- Run `python app.py`
 
 ## Testing the bot using Bot Framework Emulator
 
@@ -24,7 +24,6 @@ This sample **requires** prerequisites in order to run.
 
 - Launch Bot Framework Emulator
 - Enter a Bot URL of `http://localhost:3978/api/messages`
-
 
 ## Further reading
 

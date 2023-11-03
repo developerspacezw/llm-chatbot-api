@@ -31,21 +31,25 @@
 ## How to Run
 
 1. Install Requirements 
+
 ```bash
 pip install -r requirements.txt
 ```
 
 2. To run flask API
+
 ```bash
 python bot.py
 ```
 
 3. To run Websockets
+
 ```bash
 python websocket.py
 ```
 
-4. To run MS bot 
+4. To run MS bot
+
 ```bash
 python mschatbot\app.py
 ```
