@@ -1,0 +1,11 @@
+{
+    "type": "record",
+    "namespace": "com.generate.avroschema",
+    "name": "llm",
+    "fields": [
+      {"name": "uuid", "type": "string"},
+      {"name": "requestType", "type": "string"},
+      {"name": "request", "type": "string"},
+      {"name": "response", "type": "string"}
+    ]
+  }

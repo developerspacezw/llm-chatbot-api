@@ -18,6 +18,7 @@ from botbuilder.schema import Activity, ActivityTypes
 from bot import MyBot
 from config import DefaultConfig
 
+
 CONFIG = DefaultConfig()
 
 # Create adapter.

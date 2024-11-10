@@ -1,4 +1,7 @@
 /dev
+/dev-linux
+/dev-grpc
 /__pycache__
 /mschatbot/__pycache__
 *.bin
+node_modules

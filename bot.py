@@ -1,34 +1,41 @@
-from flask import Flask, request, Response
-import json
-from twilio.twiml.messaging_response import MessagingResponse
+from flask import Flask, request, jsonify
 from transformers import AutoTokenizer, AutoModelForCausalLM
-
+import torch
 
 app = Flask(__name__)
 
-print("Initializaing model...................")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-model = AutoModelForCausalLM.from_pretrained("gpt2") 
+# Initialize model and tokenizer once at startup
+print("Loading model and tokenizer...")
+model_name = "meta-llama/Llama-3.2-3B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
 
-print("Model Initialization Complete.")
-print("Starting HTTP server")
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+print("Model and tokenizer loaded successfully on", device)
+
 @app.route('/api/messages', methods=['POST'])
 def bot():
-    incoming_msg = request.values.get('Body', '')
-    input_ids = tokenizer.encode(incoming_msg, return_tensors='pt')
+    # Get prompt from incoming JSON payload
+    data = request.get_json()
+    prompt = data.get("prompt", "")
 
-    output = model.generate(input_ids, max_length=100, pad_token_id=tokenizer.eos_token_id)
+    # Ensure prompt is not empty
+    if not prompt:
+        return jsonify({"error": "No prompt provided"}), 400
 
-    output_text=tokenizer.decode(output[:,input_ids.shape[-1]:][0],skip_special_tokens=True)
+    # Tokenize and generate response, sending inputs to GPU if available
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    output = model.generate(**inputs, max_length=100, pad_token_id=tokenizer.eos_token_id)
+    generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
 
-    resp = MessagingResponse()
-    msg = resp.message()
-    msg.body(incoming_msg)
+    # Create JSON response
     response = {
         'type': 'message',
-        'text': f"{output_text}"
+        'text': generated_text
     }
-    return Response(json.dumps(response), mimetype='application/json', status=200)
+    return jsonify(response), 200
 
 if __name__ == '__main__':
     app.run()

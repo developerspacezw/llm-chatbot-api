@@ -1,25 +1,33 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
 from botbuilder.core import ActivityHandler, TurnContext
 from botbuilder.schema import ChannelAccount
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
-print("Initializaing model...................")
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-model = AutoModelForCausalLM.from_pretrained("gpt2")
+# Initialize the model and tokenizer
+print("Initializing meta-llama model and tokenizer...")
+model_name = "meta-llama/Llama-3.2-3B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
+
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+print("Model loaded on", device)
 
 class MyBot(ActivityHandler):
-    # See https://aka.ms/about-bot-activity-message to learn more about the message and other activity types.
-
     async def on_message_activity(self, turn_context: TurnContext):
-        input_ids = tokenizer.encode(turn_context.activity.text, return_tensors='pt')
+        # Encode the input text and move it to the appropriate device
+        input_text = turn_context.activity.text
+        input_ids = tokenizer.encode(input_text, return_tensors='pt').to(device)
 
-        output = model.generate(input_ids, max_length=512, pad_token_id=tokenizer.eos_token_id)
+        # Generate output from the model
+        output = model.generate(input_ids, max_length=400, pad_token_id=tokenizer.eos_token_id)
 
-        output_text=tokenizer.decode(output[:,input_ids.shape[-1]:][0],skip_special_tokens=True)
+        # Decode the generated text, skipping special tokens
+        output_text = tokenizer.decode(output[0], skip_special_tokens=True)
 
-        await turn_context.send_activity(f"{ output_text }")
+        # Send the response back to the user
+        await turn_context.send_activity(output_text)
 
     async def on_members_added_activity(
         self,
@@ -28,4 +36,4 @@ class MyBot(ActivityHandler):
     ):
         for member_added in members_added:
             if member_added.id != turn_context.activity.recipient.id:
-                await turn_context.send_activity("Hi there you can try asking me anything")
+                await turn_context.send_activity("Hi there! You can try asking me anything.")

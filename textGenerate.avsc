@@ -1,0 +1,11 @@
+{
+    "type": "record",
+    "name": "Message",
+    "fields": [
+      {"name": "uuid", "type": "string"},
+      {"name": "type", "type": "string"},
+      {"name": "request", "type": "string"},
+      {"name": "response", "type": "string"}
+    ]
+  }
+  

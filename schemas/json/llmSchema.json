@@ -1,0 +1,11 @@
+{
+
+    "type": "object",
+    "properties": {
+        "uuid": {"type": "string"},
+        "requestType": {"type": "string"},
+        "request": {"type": "string"},
+        "response": {"type": "string"}
+    },
+    "required": ["uuid", "request", "type", "response"]
+ }
