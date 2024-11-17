@@ -2,10 +2,33 @@ from flask import Flask, request, jsonify
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+import logging
+
+# Set up a logger
+logger = logging.getLogger("bot_llm_logger")
+logger.setLevel(logging.DEBUG)  # Set the minimum logging level to DEBUG
+
+# Create a console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)  # Set handler-specific level
+
+# Create a file handler
+file_handler = logging.FileHandler("bot_app.log")
+file_handler.setLevel(logging.DEBUG)
+
+# Define a log message format
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
 app = Flask(__name__)
 
 # Initialize model and tokenizer once at startup
-print("Loading model and tokenizer...")
+logger.info("Loading model and tokenizer...")
 model_name = "meta-llama/Llama-3.2-3B"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -13,7 +36,7 @@ model = AutoModelForCausalLM.from_pretrained(model_name)
 # Move model to GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
-print("Model and tokenizer loaded successfully on", device)
+logger.info("Model and tokenizer loaded successfully on", device)
 
 @app.route('/api/messages', methods=['POST'])
 def bot():
@@ -23,6 +46,7 @@ def bot():
 
     # Ensure prompt is not empty
     if not prompt:
+        logger.error("error : No prompt provided")
         return jsonify({"error": "No prompt provided"}), 400
 
     # Tokenize and generate response, sending inputs to GPU if available

@@ -2,30 +2,47 @@ import os
 import uuid
 import vosk
 import pyaudio
-from confluent_kafka import Producer,Consumer, KafkaError
+from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka import Producer, Consumer, KafkaException
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroSerializer, AvroDeserializer
+from confluent_kafka.serialization import StringSerializer, StringDeserializer
 from dotenv import load_dotenv
-import fastavro
 import queue
 import ast
 import json
 import threading
+import logging
 
+# Set up a logger
+logger = logging.getLogger("vtl_llm_logger")
+logger.setLevel(logging.DEBUG)  # Set the minimum logging level to DEBUG
+
+# Create a console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)  # Set handler-specific level
+
+# Create a file handler
+file_handler = logging.FileHandler("vtl_app.log")
+file_handler.setLevel(logging.DEBUG)
+
+# Define a log message format
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 load_dotenv()
 
-avroschema_directory = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(avroschema_directory, "..", "schemas/avro", "llm.avsc")
 home_dir = os.path.expanduser("~")
-bootstrap_server_url = os.getenv("BOOSTRAP_SERVER", default="localhost:9092")
+bootstrap_server_url = os.getenv("BOOTSTRAP_SERVER", default="localhost:9092")
+schema_registry_url = os.getenv("SCHEMA_REGISTRY_URL", default="http://localhost:8081")
 llm_topic_request = os.getenv("LLM_TOPIC_REQUEST")
 llm_topic_response = os.getenv("LLM_TOPIC_RESPONSE")
 
 response_queue = queue.Queue()
-
-# Load Avro schema
-with open(file_path, "rb") as schema_file:
-    print(schema_file)
-    avro_schema = fastavro.schema.load_schema(file_path)
-
 
 producer_config = {
     "bootstrap.servers": bootstrap_server_url,
@@ -37,19 +54,27 @@ consumer_config = {
     'auto.offset.reset': 'earliest', 
 }
 
-consumer = Consumer(consumer_config)
+model_path ='../SpeechModels/vosk-model-small-en-us-0.15'
 
-producer = Producer(producer_config)
+# Kafka producer and consumer configuration
+schema_registry_client = SchemaRegistryClient({"url": schema_registry_url})
 
-consumer.subscribe([llm_topic_response])
+# Define serializers and deserializers
+key_serializer = StringSerializer("utf_8")
+value_serializer = AvroSerializer(schema_registry_client, schema_str=open('../schemas/avro/llm.avsc').read())
 
-model_path = home_dir+'/SpeechModels/vosk-model-small-en-us-0.15'
+key_deserializer = StringDeserializer("utf_8")
+value_deserializer = AvroDeserializer(schema_registry_client, schema_str=open('../schemas/avro/llm.avsc').read())
 
+def delivery_report(err, msg):
+    if err is not None:
+        print(f"Message delivery failed: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
 def transcribe_audio():
     model = vosk.Model(model_path)
     recognizer = vosk.KaldiRecognizer(model, 16000)
-    response = response_queue.get(timeout=5.0)
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
     
@@ -63,53 +88,65 @@ def transcribe_audio():
             print('Processing Speech to Text')
             result = recognizer.Result()
             result_dict = ast.literal_eval(result)
-            data = {"uuid": str(genuuid), "request": result_dict["text"],"requestType": "request", "response": ""}
+            value = {"uuid": str(genuuid), "request": result_dict["text"],"requestType": "request", "response": ""}
             print(result_dict["text"])
-            with open('avro_binary_data.avro', 'wb') as avro_binary_data:
-                fastavro.schemaless_writer(avro_binary_data, avro_schema, data)
-                print("Pushing Request to LLM`")
-                if response[0] == str(genuuid).encode('utf-8'):
-                    producer.produce(llm_topic_request , key=str(genuuid).encode('utf-8'), value=json.dumps(data).encode('utf-8'), callback=delivery_report)
-                    producer.poll(0)
-        producer.flush()
+            producer = Producer(producer_config)
+
+            # Create a serialization context for the value
+            value_ctx = SerializationContext(llm_topic_request, MessageField.VALUE)
+
+            # Serialize and send message
+            try:
+                producer.produce(
+                    topic=llm_topic_request,
+                    key=key_serializer(str(genuuid), SerializationContext(llm_topic_request, MessageField.KEY)),
+                    value=value_serializer(value, value_ctx),
+                    on_delivery=delivery_report,
+                    headers={
+                        "correlation_id": "vtl",
+                        "reply_to": llm_topic_response
+                    }
+                )
+                producer.poll(1000)
+            except KafkaException as e:
+                print(f"Failed to produce message: {e}")
+            finally:
+                producer.flush()
       
     stream.stop_stream()
     stream.close()
     p.terminate()
 
 def respond():
-    while True:
-        print("Waiting to consume and respond")
-        msg = consumer.poll(1000)  # adjust the timeout as needed
-        if msg is None:
-            continue
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
+    consumer = Consumer(consumer_config)
+    consumer.subscribe([llm_topic_response])
+    try:
+        while True:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
                 continue
-            else:
-                print(f"Consumer error: {msg.error()}")
-                break
+            if msg.error():
+                if msg.error().code() == KafkaException:
+                    continue
+                else:
+                    print(f"Consumer error: {msg.error()}")
+                    break
 
-        # Check if the received response matches the correlation ID
-        response_id = response_queue.get(timeout=5.0)
-        avro_binary_data = msg.value()
-        if avro_binary_data["genuuid"] == response_id:
-            print(avro_binary_data)
-            data = fastavro.schemaless_reader(avro_binary_data, avro_schema)
-            print('Received message: {}'.format(data))
-            break  
-        consumer.commit()
+            # Deserialize the Avro message
+            headers = dict(msg.headers())
+            "vtlm" == headers.get('correlation_id')
+            key = key_deserializer(msg.key(), SerializationContext(llm_topic_response, MessageField.KEY))
+            value = value_deserializer(msg.value(), SerializationContext(llm_topic_response, MessageField.VALUE))
+            logger.info(f"Received message: {json.dumps(value)}, Deserialized Key: {key}")
+            return value["response"]
+    except KeyboardInterrupt:
+        pass
+    finally:
+        consumer.close()
 
       
 consume_thread = threading.Thread(target=respond)
-produce_thread = threading.Thread(target=transcribe_audio)  
-
-# Delivery report callback for producer
-def delivery_report(err, msg):
-    if err is not None:
-        print(f'Message delivery failed: {err}')
-    else:
-        print(f'Message delivered to {msg.topic()} [{msg.partition()}]')
+produce_thread = threading.Thread(target=transcribe_audio)
         
 
 if __name__ == "__main__":

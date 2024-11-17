@@ -23,6 +23,7 @@
         <li>flask api</li>
         <li>websockets</li>
         <li>msbot</li>
+        <li>vosk</li>
     </ol>
     </p>
 </div>
@@ -33,8 +34,10 @@
 1. Install Requirements 
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-plain.txt
 ```
+
+Then install [Pytorch](https://pytorch.org/)
 
 2. To run flask API
 
@@ -54,13 +57,25 @@ python websocket.py
 python mschatbot\app.py
 ```
 
+5. To Run Audio Transcriber
+    
+```bash
+python vttllm\main.py
+```
+
+6. Run LLM Server
+
+```bash
+python llm_run_server.py
+```
+NB
 ### Contact Me
 
 ![Developer](/img/developer_shape.png)
 
 **Email :** [Developer](mailto:prince@developer.co.zw)
 
-**WhatsApp/Mobile :** [+263717983773](tel:+263717983773)
+**WhatsApp/Mobile :** [+27783442644](tel:+27783442644)
 
 
 

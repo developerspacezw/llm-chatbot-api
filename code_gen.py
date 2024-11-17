@@ -6,7 +6,7 @@ def generate_code(text):
     # code_generator = pipeline("text2code", model="gpt2")
     
     # Generate code based on the input text
-    generated_code = code_generator(text)[0]['code']
+    generated_code = code_generator(text, max_new_tokens=50)[0]['generated_text']
 
     return generated_code
 

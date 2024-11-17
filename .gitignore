@@ -4,4 +4,6 @@
 /__pycache__
 /mschatbot/__pycache__
 *.bin
+*.log
 node_modules
+/SpeechModels
