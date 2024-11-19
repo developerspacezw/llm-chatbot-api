@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  llm_service:
+    image: llm-server:latest
+    build: .
+    container_name: llm-server
+    environment:
+      - LLM_MODEL=${LLM_MODEL}
+      - BOOTSTRAP_SERVER=${BOOTSTRAP_SERVER}
+      - SCHEMA_REGISTRY_URL=${SCHEMA_REGISTRY_URL}
+      - LLM_TOPIC_REQUEST=${LLM_TOPIC_REQUEST}
+      - LLM_TOPIC_RESPONSE=${LLM_TOPIC_RESPONSE}
+      - PERMISSIONS_URL=${PERMISSIONS_URL}
+    networks:
+        - llm-cloud-network
+networks:
+    llm-cloud-network:
+        driver: bridge

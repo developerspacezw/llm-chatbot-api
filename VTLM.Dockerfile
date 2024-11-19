@@ -1,4 +1,4 @@
-FROM docker.io/python:3.10-slim
+FROM python:3.10-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -14,7 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY ./requirements-plain.txt /app
 RUN pip install --no-cache-dir -r requirements-plain.txt
 RUN pip install --no-cache-dir torch torchvision torchaudio
-COPY ./llm_run_server.py .
-COPY ./jsonSerializer jsonSerializer
-COPY ./schemas schemas
-CMD ["python", "llm_run_server.py"]
+COPY . .
+EXPOSE 8765
+CMD ["python", "vttllm", "main.py"]

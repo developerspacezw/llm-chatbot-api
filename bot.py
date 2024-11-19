@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-
 import logging
+import os
+
+import torch
+from flask import Flask, jsonify, request
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Set up a logger
 logger = logging.getLogger("bot_llm_logger")
@@ -17,7 +18,7 @@ file_handler = logging.FileHandler("bot_app.log")
 file_handler.setLevel(logging.DEBUG)
 
 # Define a log message format
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
@@ -29,7 +30,7 @@ app = Flask(__name__)
 
 # Initialize model and tokenizer once at startup
 logger.info("Loading model and tokenizer...")
-model_name = "meta-llama/Llama-3.2-3B"
+model_name = os.getenv("LLM_MODEL")
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
@@ -38,7 +39,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 logger.info("Model and tokenizer loaded successfully on", device)
 
-@app.route('/api/messages', methods=['POST'])
+
+@app.route("/api/messages", methods=["POST"])
 def bot():
     # Get prompt from incoming JSON payload
     data = request.get_json()
@@ -51,15 +53,15 @@ def bot():
 
     # Tokenize and generate response, sending inputs to GPU if available
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    output = model.generate(**inputs, max_length=100, pad_token_id=tokenizer.eos_token_id)
+    output = model.generate(
+        **inputs, max_length=100, pad_token_id=tokenizer.eos_token_id
+    )
     generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
 
     # Create JSON response
-    response = {
-        'type': 'message',
-        'text': generated_text
-    }
+    response = {"type": "message", "text": generated_text}
     return jsonify(response), 200
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run()

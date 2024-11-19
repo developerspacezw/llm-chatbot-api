@@ -26,7 +26,6 @@
         <li>vosk</li>
         <li>confluent-kafka</li>
     </ol>
-    </p>
 </div>
 
 
@@ -34,78 +33,124 @@
 
 1. install Pre-commit
 
-```bash
-pip install pre-commit
-```
+    ```bash
+    pip install pre-commit
+    ```
 
-**NB**: Install pre-commit globally not in virtual env
-
+    **NB**: Install pre-commit globally not in virtual env
 
 2. Install pre-commit hooks
 
-```bash
-pre-commit install
-```
+    ```bash
+    pre-commit install
+    ```
 
 3. Create Virtual Environment
+   * **Command Prompt (cmd):**
+   ```commandline
+   python -m venv dev
+   dev\Scripts\activate
+   ```
 
-* **Command Prompt (cmd):**
-```commandline
-python -m venv dev
-dev\Scripts\activate
-```
+   * **PowerShell:**
+   ```commandline
+   python -m venv dev
+   dev\Scripts\Activate.ps1
+   ```
 
-* **PowerShell:**
-```commandline
-python -m venv dev
-dev\Scripts\Activate.ps1
-```
+   * **Linux/Unix:**
+   ```bash
+   python -m venv dev
+   source dev/bin/activate
+   ```
 
-* **Linux/Unix:**
-```bash
-python -m venv dev
-source dev/bin/activate
-```
+4. Create .env file
+
+    Generate and .env file and user default values found in .exampl.env file or customize the values to your liking if you are using different kafka running form dedicated host and if you desire to use you own llm from hugging face.
+
+    **NB:** Please not for now we don't support kafka which requires authentication
 
 ## How to Run Different Applications
 
 1. Install Requirements
 
-```bash
-pip install -r requirements-plain.txt
-```
+    ```bash
+    pip install -r requirements-plain.txt
+    ```
 
-Then install [Pytorch](https://pytorch.org/)
+    Then install [Pytorch](https://pytorch.org/)
+
+    * **Install Pytorch with CUDA 12.4**
+
+    ```bash
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    ```
+
+    * **Install Pytorch with CUDA 12.1**
+
+    ```bash
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    ```
+
+    * **Install Pytorch with CUDA 11.8**
+
+    ```bash
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    ```
+
+    * **Install Pytorch with CPU**
+
+    ```bash
+    pip3 install torch torchvision torchaudio
+    ```
 
 2. To run flask API
 
-```bash
-python bot.py
-```
+    ```bash
+    python bot.py
+    ```
 
 3. To run Websockets
 
-```bash
-python websocket.py
-```
+    ```bash
+    python websocket.py
+    ```
 
 4. To run MS bot
 
-```bash
-python mschatbot\app.py
-```
+    ```bash
+    python mschatbot\app.py
+    ```
 
 5. To Run Audio Transcriber
 
-```bash
-python vttllm\main.py
-```
+    ```bash
+    python vttllm\main.py
+    ```
 
 6. Run LLM Server
 
-```bash
-python llm_run_server.py
-```
+    ```bash
+    python llm_run_server.py
+    ```
+
+## Containerization
+
+1. Build Container image for llm server
+    * **Using Docker**
+    ```bash
+    docker build -f LLM.Dockerfile -t <registory>/llm-server:latest .
+    ```
+
+    * **Using Podman**
+    ```bash
+    podman build -f LLM.Dockerfile -t <registory>/llm-server:latest .
+    ```
+
+    * **Run Container**
+    ```bash
+    docker-compose up .
+    ```
 
 ### Contact Me
 
