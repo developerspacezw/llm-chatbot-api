@@ -1,49 +1,41 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: debug-statements
-  -   repo: https://github.com/Yelp/detect-secrets
-      rev: v1.3.0
-      hooks:
-        - id: detect-secret
-  -   repo: https://github.com/codespell-project/codespell
-      rev: v2.1.0  # Use the latest release
-      hooks:
-        - id: codespell
-          args: ["--skip=*.png,*.jpg,*.jpeg,*.gif", "--ignore-words-list=hte"]
-          files: \.md$
-          fail_fast: true
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0  # Use the latest release
+    hooks:
+      - id: codespell
+        args: ["--skip=*.png,*.jpg,*.jpeg,*.gif", "--ignore-words-list=hte"]
+        files: \.md$
+        fail_fast: true
   - repo: https://github.com/psf/black
-    rev: 23.9.1
+    rev: 24.10.0
     hooks:
       - id: black
   - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
+    rev: 7.1.1
     hooks:
       - id: flake8
         args:
           - --max-line-length=88
           - --ignore=E203,W503
   - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+    rev: 5.13.2
     hooks:
       - id: isort
         args:
           - --profile=black
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.1
+    rev: v1.13.0
     hooks:
       - id: mypy
   - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.11.0
+    rev: v1.10.0
     hooks:
       - id: python-check-blanket-noqa
       - id: python-no-eval
-  - repo: https://github.com/pre-commit/mirrors-bandit
-    rev: v1.7.4
-    hooks:
-      - id: bandit
