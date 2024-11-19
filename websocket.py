@@ -60,7 +60,6 @@ consumer_config = {
     "auto.offset.reset": "earliest",
 }
 
-correlation_id = "websocket"
 # Kafka producer and consumer configuration
 schema_registry_client = SchemaRegistryClient({"url": schema_registry_url})
 
@@ -97,7 +96,7 @@ def delivery_report(err, msg):
         logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
 
-def produce(Incoming_request, message_type, user_id):
+def produce(Incoming_request, message_type, user_id, correlation_id):
     """Produce a message to the Kafka topic using Avro schema"""
     producer = Producer(producer_config)
     genuuid = str(uuid.uuid4())
@@ -205,9 +204,9 @@ async def generate(websocket):
         try:
             # Receive message body
             input_message = await websocket.recv()
-
+            correlation_id = str(uuid.uuid4())
             # Produce a request to Kafka
-            produce(input_message, "request", user_id=user_id)
+            produce(input_message, "request", user_id=user_id, correlation_id=correlation_id)
 
             # Consume the response for the specific user ID
             output_text = consume(target_user_id=user_id, target_correlation_id=correlation_id)

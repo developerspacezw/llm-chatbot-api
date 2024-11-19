@@ -1,158 +1,182 @@
+import asyncio
+import websockets
 import os
 import uuid
 import vosk
 import pyaudio
+import requests
 from confluent_kafka.serialization import SerializationContext, MessageField
 from confluent_kafka import Producer, Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer, AvroDeserializer
 from confluent_kafka.serialization import StringSerializer, StringDeserializer
 from dotenv import load_dotenv
-import queue
-import ast
 import json
-import threading
 import logging
 
 # Set up a logger
-logger = logging.getLogger("vtl_llm_logger")
-logger.setLevel(logging.DEBUG)  # Set the minimum logging level to DEBUG
-
-# Create a console handler
+logger = logging.getLogger("vtl_llm_websocket_logger")
+logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)  # Set handler-specific level
-
-# Create a file handler
-file_handler = logging.FileHandler("vtl_app.log")
+console_handler.setLevel(logging.INFO)
+file_handler = logging.FileHandler("vtl_websocket.log")
 file_handler.setLevel(logging.DEBUG)
-
-# Define a log message format
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
-
-# Add the handlers to the logger
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+# Load environment variables
 load_dotenv()
 
-home_dir = os.path.expanduser("~")
+# Configuration
 bootstrap_server_url = os.getenv("BOOTSTRAP_SERVER", default="localhost:9092")
 schema_registry_url = os.getenv("SCHEMA_REGISTRY_URL", default="http://localhost:8081")
 llm_topic_request = os.getenv("LLM_TOPIC_REQUEST")
 llm_topic_response = os.getenv("LLM_TOPIC_RESPONSE")
+model_path = '../SpeechModels/vosk-model-en-us-0.42-gigaspeech/vosk-model-en-us-0.42-gigaspeech'
+permission_url = os.getenv("PERMISSIONS_URL")
 
-response_queue = queue.Queue()
-
-producer_config = {
-    "bootstrap.servers": bootstrap_server_url,
-}
-
-consumer_config = {
-    "bootstrap.servers": bootstrap_server_url,
-    "group.id": "transcribe_group",
-    'auto.offset.reset': 'earliest', 
-}
-
-model_path ='../SpeechModels/vosk-model-small-en-us-0.15'
-
-# Kafka producer and consumer configuration
+# Kafka producer/consumer configuration
 schema_registry_client = SchemaRegistryClient({"url": schema_registry_url})
-
-# Define serializers and deserializers
 key_serializer = StringSerializer("utf_8")
 value_serializer = AvroSerializer(schema_registry_client, schema_str=open('../schemas/avro/llm.avsc').read())
-
 key_deserializer = StringDeserializer("utf_8")
 value_deserializer = AvroDeserializer(schema_registry_client, schema_str=open('../schemas/avro/llm.avsc').read())
 
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"Message delivery failed: {err}")
-    else:
-        print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+producer_config = {"bootstrap.servers": bootstrap_server_url}
+consumer_config = {
+    "bootstrap.servers": bootstrap_server_url,
+    "group.id": "transcribe_group",
+    "auto.offset.reset": "earliest",
+}
 
-def transcribe_audio():
+producer = Producer(producer_config)
+consumer = Consumer(consumer_config)
+
+def delivery_report(err, msg):
+    # Called once for each produced message to indicate delivery result.
+    if err is not None:
+        logger.error('Message delivery failed: {}'.format(err))
+    else:
+        logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+
+# Authentication function
+def get_user_id_from_token(bearer_token):
+    path_for_authentication = "/api/v1/users/uservalidation"
+    url = permission_url + path_for_authentication
+    headers = {
+        "Authorization": f"Bearer {bearer_token}",
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            logger.info(f"Authenticated user: {data.get('employeeId')}")
+            return data.get("employeeId")
+        else:
+            logger.error(f"Authentication failed: {response.status_code}, {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Authentication error: {e}")
+        return None
+
+
+# Transcribe Audio
+async def transcribe_audio(websocket, user_id):
     model = vosk.Model(model_path)
     recognizer = vosk.KaldiRecognizer(model, 16000)
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
-    
-    print('Awaiting Speech To text Recognition')
+
+    logger.info(f"User {user_id} - Awaiting Speech-to-Text Recognition...")
     while True:
-        genuuid = uuid.uuid4()
         data = stream.read(4000)
         if len(data) == 0:
             break
         if recognizer.AcceptWaveform(data):
-            print('Processing Speech to Text')
             result = recognizer.Result()
-            result_dict = ast.literal_eval(result)
-            value = {"uuid": str(genuuid), "request": result_dict["text"],"requestType": "request", "response": ""}
-            print(result_dict["text"])
-            producer = Producer(producer_config)
+            result_dict = json.loads(result)
+            logger.info(f"User {user_id} - Transcribed text: {result_dict['text']}")
 
-            # Create a serialization context for the value
-            value_ctx = SerializationContext(llm_topic_request, MessageField.VALUE)
+            message_key = str(uuid.uuid4())
+            message_value = {
+                "uuid": message_key,
+                "request": result_dict["text"],
+                "requestType": "request",
+                "response": ""
+            }
 
-            # Serialize and send message
+            # Send the transcription over WebSocket
+            await websocket.send(json.dumps({"type": "transcription", "text": result_dict["text"]}))
+
+            # Send to Kafka
             try:
                 producer.produce(
                     topic=llm_topic_request,
-                    key=key_serializer(str(genuuid), SerializationContext(llm_topic_request, MessageField.KEY)),
-                    value=value_serializer(value, value_ctx),
+                    key=key_serializer(message_key, SerializationContext(llm_topic_request, MessageField.KEY)),
+                    value=value_serializer(message_value, SerializationContext(llm_topic_request, MessageField.VALUE)),
                     on_delivery=delivery_report,
-                    headers={
-                        "correlation_id": "vtl",
-                        "reply_to": llm_topic_response
-                    }
+                    headers={"correlation_id": message_key, "reply_to": llm_topic_response, "user_id": user_id},
                 )
-                producer.poll(1000)
-            except KafkaException as e:
-                print(f"Failed to produce message: {e}")
-            finally:
                 producer.flush()
-      
+                logger.info(f"User {user_id} - Message sent to Kafka. Waiting for response...")
+                response = await consume_response(message_key, user_id)
+                await websocket.send(json.dumps({"type": "response", "text": response}))
+            except KafkaException as e:
+                logger.error(f"User {user_id} - Failed to produce message: {e}")
+
     stream.stop_stream()
     stream.close()
     p.terminate()
 
-def respond():
-    consumer = Consumer(consumer_config)
-    consumer.subscribe([llm_topic_response])
-    try:
-        while True:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                if msg.error().code() == KafkaException:
-                    continue
-                else:
-                    print(f"Consumer error: {msg.error()}")
-                    break
 
-            # Deserialize the Avro message
-            headers = dict(msg.headers())
-            "vtlm" == headers.get('correlation_id')
+# Consume Kafka Response
+async def consume_response(correlation_id, user_id):
+    consumer.subscribe([llm_topic_response])
+    while True:
+        msg = consumer.poll(timeout=1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            logger.error(f"Consumer error: {msg.error()}")
+            continue
+
+        headers = {header[0]: header[1].decode() for header in (msg.headers() or [])}
+        logger.info(headers.get("correlation_id"))
+        logger.info(headers.get("user_id"))
+        if headers.get("correlation_id") == correlation_id and headers.get("user_id") == user_id:
             key = key_deserializer(msg.key(), SerializationContext(llm_topic_response, MessageField.KEY))
             value = value_deserializer(msg.value(), SerializationContext(llm_topic_response, MessageField.VALUE))
-            logger.info(f"Received message: {json.dumps(value)}, Deserialized Key: {key}")
+            logger.info(f"User {user_id} - Received response: {json.dumps(value)}, Key: {key}")
             return value["response"]
-    except KeyboardInterrupt:
-        pass
+
+
+# WebSocket Server Handler
+async def websocket_handler(websocket, path):
+    headers = websocket.request_headers
+    bearer_token = headers.get("Authorization", "").replace("Bearer ", "")
+
+    user_id = get_user_id_from_token(bearer_token)
+    if not user_id:
+        await websocket.send(json.dumps({"error": "Unauthorized"}))
+        logger.info("Unauthorized WebSocket connection attempt.")
+        return
+
+    logger.info(f"WebSocket client connected for user {user_id}")
+    try:
+        await transcribe_audio(websocket, user_id)
+    except Exception as e:
+        logger.error(f"Error for user {user_id}: {e}")
     finally:
-        consumer.close()
+        logger.info(f"WebSocket client disconnected for user {user_id}")
 
-      
-consume_thread = threading.Thread(target=respond)
-produce_thread = threading.Thread(target=transcribe_audio)
-        
 
+# Start WebSocket Server
 if __name__ == "__main__":
-    produce_thread.start()
-    consume_thread.start()
-    
-    produce_thread.join()
-    consume_thread.join()
-    
+    start_server = websockets.serve(websocket_handler, "", 8765)
+    logger.info("Starting WebSocket server on ws://localhost:8765")
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
