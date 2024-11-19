@@ -7,3 +7,5 @@
 *.log
 node_modules
 /SpeechModels
+/.scannerwork
+sonar-project.properties

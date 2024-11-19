@@ -1,8 +1,7 @@
 import os
 import asyncio
-import requests
+import authentication.jwt as auth
 import uuid
-from statistics import correlation
 
 import websockets
 
@@ -12,7 +11,6 @@ from confluent_kafka import Producer, Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer, AvroDeserializer
 from confluent_kafka.serialization import StringSerializer, StringDeserializer
-from websockets.exceptions import InvalidHandshake
 from dotenv import load_dotenv
 
 import logging
@@ -70,25 +68,6 @@ value_serializer = AvroSerializer(schema_registry_client, schema_str=open('./sch
 key_deserializer = StringDeserializer("utf_8")
 value_deserializer = AvroDeserializer(schema_registry_client, schema_str=open('./schemas/avro/llm.avsc').read())
 
-def get_user_id_from_token(bearer_token):
-    path_for_authentication = "/api/v1/users/uservalidation"
-    url = permission_url + path_for_authentication
-    headers = {
-        "Authorization": f"Bearer {bearer_token}",
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            logger.info(data.get("employeeId", None))
-            return data.get("employeeId", None)
-        else:
-            logger.error(f"Failed: {response.status_code}, {response.text}")
-            return ""
-    except requests.exceptions.RequestException as e:
-        return f"Error: {e}"
-
 def delivery_report(err, msg):
     if err is not None:
         logger.error(f"Message delivery failed: {err}")
@@ -96,13 +75,13 @@ def delivery_report(err, msg):
         logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
 
-def produce(Incoming_request, message_type, user_id, correlation_id):
+def produce(incoming_request, message_type, user_id, correlation_id):
     """Produce a message to the Kafka topic using Avro schema"""
     producer = Producer(producer_config)
     genuuid = str(uuid.uuid4())
     value = {
         "uuid": genuuid,
-        "request": Incoming_request,
+        "request": incoming_request,
         "requestType": message_type,
         "response": ""
     }
@@ -193,7 +172,7 @@ async def generate(websocket):
     token = token[len("Bearer "):].strip()
     logger.info(f"User Bearer Token: {token}")
     # Validate the token and get the user ID
-    user_id = get_user_id_from_token(token)
+    user_id = auth.JWT.get_user_id_from_token(token)
     logger.info(f"User ID :: {user_id}")
     if user_id == "":
         await websocket.close(code=4001, reason="Unauthorized or invalid token")

@@ -5,6 +5,7 @@ import uuid
 import vosk
 import pyaudio
 import requests
+import authentication.jwt as auth
 from confluent_kafka.serialization import SerializationContext, MessageField
 from confluent_kafka import Producer, Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -61,28 +62,6 @@ def delivery_report(err, msg):
         logger.error('Message delivery failed: {}'.format(err))
     else:
         logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
-
-# Authentication function
-def get_user_id_from_token(bearer_token):
-    path_for_authentication = "/api/v1/users/uservalidation"
-    url = permission_url + path_for_authentication
-    headers = {
-        "Authorization": f"Bearer {bearer_token}",
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            logger.info(f"Authenticated user: {data.get('employeeId')}")
-            return data.get("employeeId")
-        else:
-            logger.error(f"Authentication failed: {response.status_code}, {response.text}")
-            return None
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Authentication error: {e}")
-        return None
-
 
 # Transcribe Audio
 async def transcribe_audio(websocket, user_id):
@@ -159,7 +138,7 @@ async def websocket_handler(websocket, path):
     headers = websocket.request_headers
     bearer_token = headers.get("Authorization", "").replace("Bearer ", "")
 
-    user_id = get_user_id_from_token(bearer_token)
+    user_id = auth.JWT.get_user_id_from_token(bearer_token)
     if not user_id:
         await websocket.send(json.dumps({"error": "Unauthorized"}))
         logger.info("Unauthorized WebSocket connection attempt.")
@@ -177,6 +156,6 @@ async def websocket_handler(websocket, path):
 # Start WebSocket Server
 if __name__ == "__main__":
     start_server = websockets.serve(websocket_handler, "", 8765)
-    logger.info("Starting WebSocket server on ws://localhost:8765")
+    logger.info("Starting WebSocket server")
     asyncio.get_event_loop().run_until_complete(start_server)
     asyncio.get_event_loop().run_forever()
