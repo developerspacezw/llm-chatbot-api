@@ -10,3 +10,4 @@ node_modules
 /SpeechModels
 /.scannerwork
 sonar-project.properties
+/app_models

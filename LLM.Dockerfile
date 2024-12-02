@@ -1,20 +1,66 @@
-FROM docker.io/python:3.10-slim
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Base image
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+
+USER root
+# Install required system packages
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt/lists \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
     gcc \
     libasound2-dev \
-    libportaudio2 \
-    portaudio19-dev \
     libavcodec-dev \
     libavformat-dev \
+    libportaudio2 \
     libswscale-dev \
+    lsb-release \
+    portaudio19-dev \
     python3-dev \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-COPY ./requirements-plain.txt /app
-RUN pip install --no-cache-dir -r requirements-plain.txt
-RUN pip install --no-cache-dir torch torchvision torchaudio
-COPY ./llm_run_server.py .
-COPY ./jsonSerializer jsonSerializer
-COPY ./schemas schemas
+    telnet \
+    wget &&\
+    rm -rf /var/lib/apt/lists/*
+
+# Create a user and group for the application
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+
+# Set working directory and permissions
+WORKDIR /app
+RUN mkdir -p /app/logs /app/models && chown -R appuser:appgroup /app
+
+# Switch to appuser for security
+USER appuser
+
+# Copy Python dependencies
+COPY ./requirements-plain.txt /app/
+
+# Convert encoding if necessary
+USER root
+RUN iconv -f utf-16le -t utf-8 /app/requirements-plain.txt -o /app/requirements-plain-utf8.txt || true && \
+    mv /app/requirements-plain-utf8.txt /app/requirements-plain.txt
+
+# Setup environment variables
+USER appuser
+ENV PATH="/home/appuser/.local/bin:$PATH"
+ENV PIP_CACHE_DIR="/tmp/.pip-cache"
+ENV HF_HOME="/app/models"
+
+# Install Python dependencies
+USER root
+RUN mkdir -p /home/appuser/.local /tmp/.pip-cache && chown -R appuser:appgroup /home/appuser /tmp/.pip-cache
+USER appuser
+RUN pip install --upgrade pip && \
+    pip install -r requirements-plain.txt && \
+    pip install fastavro sentencepiece torch torchaudio torchvision weaviate-client==3.*
+
+# Copy application code
+COPY ./llm_run_server.py /app/
+COPY ./jsonSerializer /app/jsonSerializer
+COPY ./schemas /app/schemas
+
+# Set the log file environment variable
+ENV LOG_FILE="/app/logs/llm_server.log"
+
+# Default command
 CMD ["python", "llm_run_server.py"]
