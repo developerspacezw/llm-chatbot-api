@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     libportaudio2 \
     libswscale-dev \
     lsb-release \
+    fastavro \
     portaudio19-dev \
     python3-dev \
     telnet \
