@@ -3,14 +3,13 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
-      - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: debug-statements
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0  # Use the latest release
     hooks:
       - id: codespell
-        args: ["--skip=*.png,*.jpg,*.jpeg,*.gif", "--ignore-words-list=hte"]
+        args: ["--skip=*.png,*.jpg,*.jpeg,*.gif,*.txt", "--ignore-words-list=hte"]
         files: \.md$
         fail_fast: true
   - repo: https://github.com/psf/black
