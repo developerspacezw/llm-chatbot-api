@@ -18,4 +18,4 @@ COPY . .
 EXPOSE 8001
 
 # Set the default command to run the application
-CMD ["python", "websockets.py"]
+CMD ["python", "websocket.py"]
