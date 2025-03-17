@@ -1,9 +1,8 @@
 import logging
 import os
 
-import torch
-from flask import Flask, jsonify, request
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from flask import Flask, Response, jsonify, request
+from ollama import chat
 
 # Set up a logger
 logger = logging.getLogger("bot_llm_logger")
@@ -31,13 +30,13 @@ app = Flask(__name__)
 # Initialize model and tokenizer once at startup
 logger.info("Loading model and tokenizer...")
 model_name = os.getenv("LLM_MODEL")
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+logger.info(model_name)
+
 
 # Move model to GPU if available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-logger.info("Model and tokenizer loaded successfully on", device)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# model.to(device)
+# logger.info("Model and tokenizer loaded successfully on", device)
 
 
 @app.route("/api/messages", methods=["POST"])
@@ -51,16 +50,16 @@ def bot():
         logger.error("error : No prompt provided")
         return jsonify({"error": "No prompt provided"}), 400
 
-    # Tokenize and generate response, sending inputs to GPU if available
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    output = model.generate(
-        **inputs, max_length=100, pad_token_id=tokenizer.eos_token_id
-    )
-    generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
+    def generate():
+        stream = chat(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            stream=True,
+        )
+        for chunk in stream:
+            yield chunk["message"]["content"]
 
-    # Create JSON response
-    response = {"type": "message", "text": generated_text}
-    return jsonify(response), 200
+    return Response(generate(), content_type="text/plain")
 
 
 if __name__ == "__main__":

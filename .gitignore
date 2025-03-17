@@ -1,4 +1,5 @@
 /dev
+/venv
 /dev-linux
 /dev-grpc
 /__pycache__

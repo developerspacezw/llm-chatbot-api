@@ -1,8 +1,8 @@
 # Base image
 FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
-
 USER root
+
 # Install required system packages
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt/lists \
@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     portaudio19-dev \
     python3-dev \
     telnet \
-    wget &&\
+    wget && \
     rm -rf /var/lib/apt/lists/*
 
 # Create a user and group for the application
@@ -51,8 +51,10 @@ USER root
 RUN mkdir -p /home/appuser/.local /tmp/.pip-cache && chown -R appuser:appgroup /home/appuser /tmp/.pip-cache
 USER appuser
 RUN pip install --upgrade pip && \
+    pip install fastavro && \
+    pip install boto3 chromadb langchain minio ollama langchain-community && \
     pip install -r requirements-plain.txt && \
-    pip install fastavro sentencepiece torch torchaudio torchvision weaviate-client==3.*
+    pip install sentencepiece torch torchaudio torchvision weaviate-client==3.*
 
 # Copy application code
 COPY ./llm_run_server.py /app/
