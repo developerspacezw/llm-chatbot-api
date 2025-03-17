@@ -39,7 +39,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: WebSocket.Dockerfile
+          file: Websocket.Dockerfile
           push: true
           tags: |
             ghcr.io/developerspacezw/llm-chatbot-api-websocket:release
