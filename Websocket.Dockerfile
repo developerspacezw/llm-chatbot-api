@@ -9,6 +9,7 @@ RUN  pip install --no-cache-dir \
         websockets==13.0 \
         confluent-kafka==2.6.0 \
         python-dotenv==1.0.0 \
+        requests \
         elastic-apm==6.15.0
 
 # Copy the application code
