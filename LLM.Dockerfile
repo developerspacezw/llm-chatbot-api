@@ -52,7 +52,7 @@ RUN mkdir -p /home/appuser/.local /tmp/.pip-cache && chown -R appuser:appgroup /
 USER appuser
 RUN pip install --upgrade pip && \
     pip install fastavro && \
-    pip install boto3 chromadb langchain minio ollama langchain-community && \
+    pip install boto3 chromadb elastic-apm langchain minio ollama langchain-community && \
     pip install -r requirements-plain.txt && \
     pip install sentencepiece torch torchaudio torchvision weaviate-client==3.*
 

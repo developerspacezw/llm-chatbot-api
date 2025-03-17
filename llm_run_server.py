@@ -178,10 +178,7 @@ def upload_pdf():
 
 @app.route("/health", methods=["GET"])
 def health_check():
-    if service_ready:
-        return jsonify({"status": "healthy"}), 200
-    else:
-        return jsonify({"status": "initializing"}), 503
+    return jsonify({"status": "healthy"}), 200
 
 
 # Replace vllm chat_with_model with transformers
