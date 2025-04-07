@@ -45,44 +45,44 @@ jobs:
             ghcr.io/developerspacezw/llm-chatbot-api-websocket:release
             ghcr.io/developerspacezw/llm-chatbot-api-websocket:${{ github.sha }}
 
-            - name: Create GitHub Release
-            if: success()
-            uses: softprops/action-gh-release@v1
-            with:
-              tag_names: llm-chatbot-api-llm,llm-chatbot-api-websocket,
-              name: Build ${{ env.BUILD_NUMBER }} (${{ env.TIMESTAMP }})
-              body: |
-                🚀 Automated build from commit ${{ github.sha }}
+      - name: Create GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_names: llm-chatbot-api-llm,llm-chatbot-api-websocket,
+          name: Build ${{ env.BUILD_NUMBER }} (${{ env.TIMESTAMP }})
+          body: |
+            🚀 Automated build from commit ${{ github.sha }}
 
-                🗒️ Release Notes:
+            🗒️ Release Notes:
 
-                ${{ steps.pr-description.outputs.PR_BODY }}
+            ${{ steps.pr-description.outputs.PR_BODY }}
 
-                - Image `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}`
+            - Image `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}`
 
-                - Image tags:
-                  - `release`
-                  - `${{ env.BUILD_NUMBER }}`
-                  - `${{ env.TIMESTAMP }}`
+            - Image tags:
+              - `release`
+              - `${{ env.BUILD_NUMBER }}`
+              - `${{ env.TIMESTAMP }}`
 
-                Pull images:
+            Pull images:
 
-                🐳 Using Docker
-                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
-                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
-                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
-                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
+            🐳 Using Docker
+            `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
+            `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
+            `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
+            `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
 
 
-                📦 Using Podamn
-                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
-                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
-                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
-                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
+            📦 Using Podamn
+            `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
+            `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
+            `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
+            `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
 
-              draft: false
-              prerelease: false
-              token: ${{ secrets.GIT_TOKEN }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GIT_TOKEN }}
 
   notify:
     needs: build
