@@ -45,6 +45,45 @@ jobs:
             ghcr.io/developerspacezw/llm-chatbot-api-websocket:release
             ghcr.io/developerspacezw/llm-chatbot-api-websocket:${{ github.sha }}
 
+            - name: Create GitHub Release
+            if: success()
+            uses: softprops/action-gh-release@v1
+            with:
+              tag_names: llm-chatbot-api-llm,llm-chatbot-api-websocket,
+              name: Build ${{ env.BUILD_NUMBER }} (${{ env.TIMESTAMP }})
+              body: |
+                🚀 Automated build from commit ${{ github.sha }}
+
+                🗒️ Release Notes:
+
+                ${{ steps.pr-description.outputs.PR_BODY }}
+
+                - Image `ghcr.io/${{ github.actor }}/${{ github.event.repository.name }}`
+
+                - Image tags:
+                  - `release`
+                  - `${{ env.BUILD_NUMBER }}`
+                  - `${{ env.TIMESTAMP }}`
+
+                Pull images:
+
+                🐳 Using Docker
+                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
+                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
+                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
+                `docker pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
+
+
+                📦 Using Podamn
+                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:release`
+                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-websocket:${{ github.sha }}`
+                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:release`
+                `podman pull ghcr.io/${{ github.actor }}/llm-chatbot-api-llm:${{ github.sha }}`
+
+              draft: false
+              prerelease: false
+              token: ${{ secrets.GIT_TOKEN }}
+
   notify:
     needs: build
     runs-on: ubuntu-latest
@@ -56,12 +95,14 @@ jobs:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            Build Status : ${{ needs.build.result }}
+            ${{ format('{0} App Build Complete!', needs.build.result == 'success' && '✅' || '❌') }}
 
-            ${{ github.actor }} created commit:
+            🚀 Build Status: ${{ needs.build.result == 'success' && 'SUCCESS ✅' || 'FAILED ❌' }}
 
-            Commit message: ${{ github.event.commits[0].message }}
+            👤 ${{ github.actor }} created commit:
 
-            Repository: ${{ github.repository }}
+            📝 Commit message: ${{ github.event.commits[0].message }}
 
-            See changes: https://github.com/${{ github.repository }}/commit/${{github.sha}}
+            🔗 Repository: ${{ github.repository }}
+
+            🔍 View changes: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
