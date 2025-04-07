@@ -3,7 +3,7 @@ FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
 USER root
 
-# Install system packages
+# Install required system packages
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt/lists \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -22,41 +22,55 @@ RUN --mount=type=cache,target=/var/cache/apt \
     wget && \
     rm -rf /var/lib/apt/lists/*
 
-# Create app user/group
+# Create a user and group for the application
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
-# Set up workspace
+# Set working directory and permissions
 WORKDIR /app
 RUN mkdir -p /app/logs /app/models && chown -R appuser:appgroup /app
 
-# Copy requirements file and fix encoding
+# Switch to appuser for security
+USER appuser
+
+# Copy Python dependencies
 COPY ./requirements-plain.txt /app/
+
+# Convert encoding if necessary
+USER root
 RUN iconv -f utf-16le -t utf-8 /app/requirements-plain.txt -o /app/requirements-plain-utf8.txt || true && \
     mv /app/requirements-plain-utf8.txt /app/requirements-plain.txt
 
-# Set environment variables
+# Setup environment variables
+USER appuser
 ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PIP_CACHE_DIR="/tmp/.pip-cache"
 ENV HF_HOME="/app/models"
 
 # Install Python dependencies
-RUN mkdir -p /home/appuser/.local /tmp/.pip-cache && \
-    chown -R appuser:appgroup /home/appuser /tmp/.pip-cache
+USER root
+RUN mkdir -p /home/appuser/.local /tmp/.pip-cache && chown -R appuser:appgroup /home/appuser /tmp/.pip-cache
 USER appuser
 RUN pip install --upgrade pip && \
     pip install fastavro && \
-    pip install boto3 chromadb elastic-apm fastavro langchain minio ollama langchain-community && \
+    pip install boto3 chromadb langchain minio ollama langchain-community && \
     pip install -r requirements-plain.txt && \
     pip install sentencepiece torch torchaudio torchvision weaviate-client==3.*
 
-# Copy application code with explicit ownership
-USER root
+# Copy application code
 COPY ./llm_run_server.py /app/
 COPY ./jsonSerializer /app/jsonSerializer
 COPY ./schemas /app/schemas
-RUN chown -R appuser:appgroup /app/llm_run_server.py /app/jsonSerializer /app/schemas
+
+# Set permissions for the application files
+USER root
+RUN chown -R appuser:appgroup /app
 USER appuser
 
-# Final setup
+# Debug: List contents of /app
+RUN ls -l /app
+
+# Set the log file environment variable
 ENV LOG_FILE="/app/logs/llm_server.log"
+
+# Default command
 CMD ["python", "llm_run_server.py"]
