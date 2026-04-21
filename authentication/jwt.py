@@ -1,7 +1,7 @@
-import requests
+import logging
 import os
 
-import logging
+import requests
 
 # Set up a logger
 logger = logging.getLogger("authentication_module_logger")
@@ -16,14 +16,15 @@ file_handler = logging.FileHandler("authentication_module_app.log")
 file_handler.setLevel(logging.DEBUG)
 
 # Define a log message format
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
 # Add the handlers to the logger
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
-permission_url = os.getenv("PERMISSIONS_URL")
+permission_url = os.getenv("PERMISSIONS_URL", "")
+
 
 class JWT:
     def __init__(self):
@@ -35,10 +36,17 @@ class JWT:
         url = permission_url + path_for_authentication
         headers = {
             "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.post(
+                url,
+                headers=headers,
+                json={
+                    "requiredRoles": [],
+                    "requiredPermissions": ["user:read", "user:create"],
+                },
+            )
             if response.status_code == 200:
                 data = response.json()
                 return data.get("employeeId", None)
